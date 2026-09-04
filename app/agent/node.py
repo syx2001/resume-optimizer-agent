@@ -78,7 +78,6 @@ def save_resume_node(state:AgentState, runtime:Runtime)-> dict[str, Any]:
         "resume_saved": True,
     }
 
-
 def retrieve_guidelines_node(
       state: AgentState,
   ) -> dict[str, Any]:
@@ -434,11 +433,11 @@ def plan_approval_node(
     写入：
         plan_approved
     """
-    decision = interrupt(
+    decision = interrupt(#返回是一个bool
         {
             "type": "resume_plan_approval",
             "message": "请确认是否执行以下简历优化计划。",
-            "plan": state["optimization_plan"],
+            "plan": state["optimization_plan"],#取得审批的内容
         }
     )
 

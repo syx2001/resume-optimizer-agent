@@ -80,8 +80,6 @@ class ResumeJobMatcher:
                 content=(
                     "Match阶段工具使用规则：岗位与简历匹配时，如需工具辅助，"
                     "可以调用用于匹配岗位与简历的工具，用于比较简历文本与岗位关键词的覆盖情况。"
-                    "前置 RAG 节点已经完成知识库检索，Match 阶段不要调用 search_knowledge_base。"
-                    "不要调用 calculator、get_current_time 或任何仓库工具。"
                     "工具调用完成后停止调用工具，并生成最终的 MatchResult。"
                 )
             ),

@@ -18,24 +18,22 @@ TaskStatus = Literal[
 
 
 class AgentState(MessagesState, total=False):
-    # 用户输入
+    # 用户输入 users
     resume_input: dict  # ResumeInput.model_dump()
     job_input: dict  # JobDescriptionInput.model_dump()
     target_language: str  # 目标输出语言
 
-    # 解析和分析结果
+    # 解析和分析结果 llm
     resume_profile: dict  # ResumeProfile.model_dump()
     job_profile: dict  # JobProfile.model_dump()
     match_result: dict  # MatchResult.model_dump()
     optimization_plan: dict  # OptimizationPlan.model_dump()
-    #记忆
-    resume_source: Literal[
+    resume_source: Literal[ #判断当前使用的是用户新传入的简历还是数据库里默认的
       "request",
       "saved_default",
     ]
-    # 生成和校验结果
     optimized_resume: str  # 当前候选简历
-    changes: list[dict]  # ResumeChange.model_dump() 列表
+    changes: list[dict]  # 改了什么，为什么改
     validation_results: list[dict]  # 关键词和格式检查结果
 
     # 流程控制
@@ -44,7 +42,8 @@ class AgentState(MessagesState, total=False):
     repair_attempts: int  # 修复次数
     final_answer: dict  # ResumeOptimizationResult.model_dump()
     error: str  # 失败或阻塞原因
-    repair_instructions: list[str]
+    repair_instructions: list[str]# 下一轮怎么改
+
     #rag相关
     rag_context: str
     rag_sources: list[dict]
