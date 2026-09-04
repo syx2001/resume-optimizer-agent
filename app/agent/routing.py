@@ -3,12 +3,12 @@ from app.schemas import ValidationResult
 MAX_REPAIR_ATTEMPTS = 1
 def route_after_intake(state: AgentState) -> str:
     """
-    intake 鑺傜偣鎵ц鍚庣殑璺敱銆?
+    intake 节点执行后的路由。
 
-    鎴愬姛锛?
+    成功：
         load_resume
 
-    澶辫触锛?
+    失败：
         finalize
     """
 
@@ -32,12 +32,12 @@ def route_after_load_resume(state: AgentState) -> str:
 
 def route_after_parse_resume(state: AgentState) -> str:
     """
-    绠€鍘嗚В鏋愯妭鐐规墽琛屽悗鐨勮矾鐢便€?
+    简历解析节点执行后的路由。
 
-    鎴愬姛锛?
+    成功：
         save_resume
 
-    澶辫触锛?
+    失败：
         finalize
     """
 
@@ -49,12 +49,12 @@ def route_after_parse_resume(state: AgentState) -> str:
 
 def route_after_parse_job(state: AgentState) -> str:
     """
-    JD 瑙ｆ瀽鑺傜偣鎵ц鍚庣殑璺敱銆?
+    JD 解析节点执行后的路由。
 
-    鎴愬姛锛?
+    成功：
         match
 
-    澶辫触锛?
+    失败：
         finalize
     """
 
@@ -66,12 +66,12 @@ def route_after_parse_job(state: AgentState) -> str:
 
 def route_after_match(state: AgentState) -> str:
     """
-    宀椾綅鍖归厤鍒嗘瀽鍚庣殑璺敱銆?
+    岗位匹配分析后的路由。
 
-    鎴愬姛锛?
+    成功：
         plan
 
-    澶辫触锛?
+    失败：
         finalize
     """
 
@@ -83,12 +83,12 @@ def route_after_match(state: AgentState) -> str:
 
 def route_after_plan(state: AgentState) -> str:
     """
-    浼樺寲璁″垝鐢熸垚鍚庣殑璺敱銆?
+    优化计划生成后的路由。
 
-    鎴愬姛锛?
+    成功：
         plan_approval
 
-    澶辫触锛?
+    失败：
         finalize
     """
 
@@ -100,12 +100,12 @@ def route_after_plan(state: AgentState) -> str:
 
 def route_after_plan_approval(state: AgentState) -> str:
     """
-    鐢ㄦ埛瀹℃壒浼樺寲璁″垝鍚庣殑璺敱銆?
+    用户审批优化计划后的路由。
 
-    鐢ㄦ埛鎵瑰噯锛?
+    用户批准：
         rewrite
 
-    鐢ㄦ埛鎷掔粷锛?
+    用户拒绝：
         blocked
     """
 
@@ -120,12 +120,12 @@ def route_after_plan_approval(state: AgentState) -> str:
 
 def route_after_rewrite(state: AgentState) -> str:
     """
-    绠€鍘嗘敼鍐欏悗鐨勮矾鐢便€?
+    简历改写后的路由。
 
-    鎴愬姛锛?
+    成功：
         validate
 
-    澶辫触锛?
+    失败：
         finalize
     """
 
@@ -137,37 +137,37 @@ def route_after_rewrite(state: AgentState) -> str:
 
 def route_after_validation(state: AgentState) -> str:
     """
-    鏍规嵁鍊欓€夌畝鍘嗘牎楠岀粨鏋滃喅瀹氫笅涓€姝ャ€?
+    根据候选简历校验结果决定下一步。
 
-    璺敱瑙勫垯锛?
+    路由规则：
 
-    1. validate 鏈韩鎵ц寮傚父
+    1. validate 本身执行异常
        -> finalize
 
-    2. 娌℃湁浠讳綍鏍￠獙缁撴灉
+    2. 没有任何校验结果
        -> blocked
 
-    3. 鎵€鏈夋牎楠岄兘閫氳繃
+    3. 所有校验都通过
        -> finalize
 
-    4. 瀛樺湪涓嶅彲鑷姩淇鐨勯棶棰?
+    4. 存在不可自动修复的问题
        -> blocked
 
-    5. 鍙慨澶嶏紝浣嗗凡缁忚揪鍒版渶澶т慨澶嶆鏁?
+    5. 可以修复，但已经达到最大修复次数
        -> blocked
 
-    6. 鎵€鏈夊け璐ラ」鍧囧彲鑷姩淇锛屽苟涓旀湭杈惧埌淇娆℃暟涓婇檺
+    6. 所有失败项均可自动修复，且未达到修复次数上限
        -> repair
     """
 
-    # validate 鑺傜偣鏈韩鍙戠敓鎵ц寮傚父銆?
+    # validate 节点本身发生执行异常。
     if state.get("task_status") == "failed":
         return "finalize"
 
     raw_results = state.get("validation_results", [])
 
-    # 娌℃湁浜х敓浠讳綍鏍￠獙缁撴灉鏃讹紝
-    # 涓嶈兘鐩存帴璁や负鏍￠獙閫氳繃銆?
+    # 没有产生任何校验结果时，
+    # 不能直接认为校验通过。
     if not raw_results:
         return "blocked"
 
@@ -182,12 +182,12 @@ def route_after_validation(state: AgentState) -> str:
         if not result.passed
     ]
 
-    # 鎵€鏈夋鏌ラ兘閫氳繃銆?
+    # 所有检查都通过。
     if not failed_results:
         return "finalize"
 
-    # 鍙瀛樺湪涓€涓笉鍙嚜鍔ㄤ慨澶嶇殑闂锛?
-    # 灏卞仠姝㈣嚜鍔ㄤ慨澶嶃€?
+    # 只要存在一个不可自动修复的问题，
+    # 就停止自动修复。
     if any(
         not result.repairable
         for result in failed_results
@@ -199,22 +199,22 @@ def route_after_validation(state: AgentState) -> str:
         0,
     )
 
-    # 杈惧埌鏈€澶т慨澶嶆鏁帮紝鍋滄寰幆銆?
+    # 达到最大修复次数，停止循环。
     if repair_attempts >= MAX_REPAIR_ATTEMPTS:
         return "blocked"
 
-    # 褰撳墠鎵€鏈夊け璐ラ」閮藉彲浠ヨ嚜鍔ㄤ慨澶嶃€?
+    # 当前所有失败项都可以自动修复。
     return "repair"
 
 
 def route_after_repair(state: AgentState) -> str:
     """
-    repair 鑺傜偣鎵ц鍚庣殑璺敱銆?
+    repair 节点执行后的路由。
 
-    鎴愬姛锛?
+    成功：
         rewrite
 
-    澶辫触锛?
+    失败：
         finalize
     """
 
@@ -226,10 +226,10 @@ def route_after_repair(state: AgentState) -> str:
 
 def route_after_blocked(state: AgentState) -> str:
     """
-    blocked 鑺傜偣鎵ц鍚庣粺涓€杩涘叆 finalize銆?
+    blocked 节点执行后统一进入 finalize。
 
-    blocked 鏄甯镐笟鍔″仠姝㈢姸鎬侊紝
-    鏈€缁堜粛鐒堕渶瑕佹瀯閫?ResumeOptimizationResult銆?
+    blocked 是正常的业务停止状态，
+    最终仍然需要构造 ResumeOptimizationResult。
     """
 
     return "finalize"

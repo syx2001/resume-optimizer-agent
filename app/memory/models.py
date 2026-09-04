@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-#resume闀挎湡璁板繂鐩稿叧
+# Resume 长期记忆相关模型
 class StoredResume(BaseModel):
     resume_id: str
     user_id: str

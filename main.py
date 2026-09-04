@@ -31,7 +31,7 @@ class OptimizeRequest(BaseModel):
     language: str = Field(default="auto", max_length=30)
     target_language: str = Field(default="auto", max_length=30)
     session_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
-    approval: bool | None = None
+    approval: bool | None = None # HITL
 
 
 class OptimizeResponse(BaseModel):
@@ -51,7 +51,7 @@ _graph = None
 
 def get_app_graph():
     """Initialize PostgreSQL once and compile the graph with a checkpointer."""
-    global _graph
+    global _graph #全局变量
     if _graph is None:
         resources = initialize_database()
         _graph = compile_graph(
