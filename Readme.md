@@ -7,12 +7,12 @@
 - 用 LangGraph 编排有状态的多节点 Agent 工作流
 - 用 LangGraph Checkpointer 保存会话状态，并支持中断后恢复
 - 用 LangGraph Store 保存用户默认简历和 RAG 数据
-- 用 RAG 检索简历优化规范，为 Agent 提供可追溯上下文
+- 用 RAG 检索简历优化规范
 - 用 LLM 生成 Pydantic 结构化结果，降低自由文本解析成本
-- 用工具调用完成关键词覆盖率、语义匹配和知识库检索
+- 用工具调用完成语义匹配和知识库检索
 - 用 HITL（Human-in-the-Loop）让用户审批优化计划
 - 用 Validator + Repair Loop 进行校验、修复和有限次重试
-- 其中前端部分均由codex生成
+- 实事求是：其中前端由codex生成
 ## 技术栈
 
 | 层次 | 技术 | 用途 |
@@ -22,7 +22,6 @@
 | 结构化输出 | Pydantic 2 | 定义简历、岗位、计划、校验结果的数据契约 |
 | RAG | Embedding API、PostgreSQL Store | 文档切分、向量检索和规范引用 |
 | 持久化 | PostgreSQL、LangGraph Checkpointer | 保存 Agent checkpoint、Memory 和 RAG 数据 |
-| 文档处理 | pypdf、LangChain Text Splitters | 读取 PDF/TXT/Markdown 并切分文本 |
 | 基础设施 | 本地启动 PostgreSQL |
 
 ## Agent 工作流
@@ -167,66 +166,6 @@ python main.py
 python main.py --host 0.0.0.0 --port 8000 --reload
 ~~~
 
-## API 使用
-
-### 健康检查
-
-~~~bash
-curl http://127.0.0.1:8000/health
-~~~
-
-### 发起优化任务
-
-第一次请求需要提供岗位描述；`session_id` 建议由客户端生成并保存：
-
-~~~bash
-curl -X POST http://127.0.0.1:8000/api/optimize \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "demo-user",
-    "session_id": "demo-session-001",
-    "resume_content": "张三，5年后端开发经验，熟悉 Python、FastAPI 和 PostgreSQL。",
-    "job_content": "招聘后端工程师，要求熟悉 Python、FastAPI、数据库和微服务。",
-    "role_title": "后端工程师",
-    "language": "zh",
-    "target_language": "zh"
-  }'
-~~~
-
-如果 Agent 生成了优化计划，响应状态为 `approval_required`，其中包含 `plan`、`match_result` 和 `rag_sources`。
-
-### 审批并恢复工作流
-
-审批请求只需要携带同一个 `session_id`：
-
-~~~bash
-curl -X POST http://127.0.0.1:8000/api/optimize \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "demo-user",
-    "session_id": "demo-session-001",
-    "approval": true
-  }'
-~~~
-
-`approval: true` 继续执行重写和校验；`approval: false` 会进入 `blocked`，不会继续修改简历。
-
-### SSE 流式接口
-
-~~~bash
-curl -N -X POST http://127.0.0.1:8000/api/optimize/stream \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "demo-user",
-    "session_id": "demo-stream-001",
-    "resume_content": "我的简历内容",
-    "job_content": "目标岗位描述",
-    "target_language": "zh"
-  }'
-~~~
-
-流中包含三类事件：`node`（节点状态更新）、`custom`（工具自定义事件）和 `result`（最终结果）。
-
 ## 数据持久化
 
 - **Checkpointer**：以 `session_id` 作为 `thread_id`，保存工作流中断前的 State，支持审批后继续执行。
@@ -242,7 +181,7 @@ python scripts/reset_user_data.py --yes
 
 该脚本不会删除 RAG 文档或 LangGraph checkpoint。
 
-## 如何阅读 Agent 实现
+## 如何阅读
 
 建议按以下顺序理解代码：
 
