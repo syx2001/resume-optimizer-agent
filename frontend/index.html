@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resume Optimizer Agent</title>
+  <style>
+    :root { font-family: Inter, system-ui, sans-serif; color: #eaf0ff; background: #0c1220; }
+    * { box-sizing: border-box; } body { margin: 0; }
+    main { width: min(1180px, calc(100% - 32px)); margin: auto; padding: 36px 0 60px; }
+    h1 { margin: 0 0 8px; font-size: 30px; } .sub { color: #93a1bd; margin: 0 0 28px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .panel, .card { border: 1px solid #283653; background: #141d30; border-radius: 16px; padding: 18px; }
+    label { display: block; color: #b9c5dc; font-size: 13px; margin: 0 0 8px; }
+    textarea, input, select { width: 100%; color: #edf3ff; background: #0e1728; border: 1px solid #344565; border-radius: 10px; padding: 12px; font: inherit; }
+    textarea { min-height: 300px; resize: vertical; line-height: 1.5; } .small { min-height: auto; }
+    .controls { display: flex; gap: 10px; align-items: end; margin-top: 16px; } .controls > * { flex: 1; }
+    button { border: 0; border-radius: 10px; padding: 12px 18px; color: white; background: #4c76e8; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; } .approve { background: #27966d; } .reject { background: #a64f60; }
+    #status { margin: 18px 0; color: #94b7ff; min-height: 22px; } .hidden { display: none; }
+    .workflow { margin-top: 18px; }
+    .workflow-head { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+    .workflow-head h2 { margin:0; }
+    .demo-badge { color:#ffd27d; font-size:12px; border:1px solid #765d2c; border-radius:999px; padding:5px 9px; }
+    .flow { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; align-items:stretch; }
+    .flow-node { position:relative; flex:1 1 145px; min-width:125px; padding:12px; border:1px solid #344565; border-radius:12px; background:#0e1728; transition:.25s; }
+    .flow-node:not(:last-child)::after { content:'→'; position:absolute; right:-10px; top:27px; color:#667899; z-index:2; }
+    .flow-node .node-state { display:block; margin-top:5px; color:#8190aa; font-size:12px; }
+    .flow-node.active { border-color:#6f98ff; background:#1c3263; box-shadow:0 0 0 2px rgba(111,152,255,.15); }
+    .flow-node.done { border-color:#318d70; background:#12352f; }
+    .flow-node.wait { border-color:#b98235; background:#3a2b16; }
+    .flow-node.skip { border-color:#59657c; background:#1a2232; opacity:.7; }
+    .flow-node.fail { border-color:#a64f60; background:#3c2029; }
+    .error-box { margin-top:12px; padding:14px 16px; border:1px solid #a64f60; border-radius:12px; background:#3c2029; color:#ffd5d5; line-height:1.6; }
+    .error-box strong { color:#ff9b9b; }
+    .diagnostic { margin-top:12px; border-left:3px solid #b98235; padding:12px 14px; background:#211b13; color:#e8d9bb; line-height:1.6; }
+    .diagnostic h3 { margin:0 0 6px; color:#ffd27d; }
+    .diagnostic ul { margin:6px 0 0; padding-left:20px; }
+    .flow-note { margin:14px 0 0; color:#91a0bb; font-size:13px; line-height:1.5; }
+    .demo-actions { display:flex; gap:10px; margin-top:12px; }
+    .secondary { background:#33476d; }
+    .result { margin-top: 18px; } .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .metric { font-size: 26px; font-weight: 800; margin-top: 4px; } .muted { color: #91a0bb; font-size: 13px; }
+    .match-hero { margin: -2px -2px 18px; padding: 22px; text-align: center; border: 1px solid #496fe0; border-radius: 14px; background: linear-gradient(135deg, #1d3264, #172341); }
+    .hero-score { color: #8eb0ff; font-size: 58px; line-height: 1.05; font-weight: 900; margin: 7px 0 10px; }
+    .match-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+    .match-summary > div { padding: 12px; border-radius: 10px; background: #0e1728; color: #cbd6eb; line-height: 1.6; }
+    .plan li, .changes li { margin: 8px 0; line-height: 1.5; } pre { white-space: pre-wrap; line-height: 1.55; margin: 0; }
+    .pass { color: #65d3a5; } .fail { color: #ff9b9b; } .diff { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 760px) { .grid, .diff, .cards { grid-template-columns: 1fr; } .controls { flex-direction: column; align-items: stretch; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Resume Optimizer Agent</h1>
+  <p class="sub">LangGraph 驱动的简历解析、岗位匹配、审批、改写与事实校验工作流</p>
+
+  <section class="grid">
+    <div class="panel"><label for="resume">原始简历 <span class="muted">（同一会话可留空，复用上一份）</span></label><textarea id="resume" placeholder="首次优化请粘贴简历文本；更换 JD 时可留空…"></textarea></div>
+    <div class="panel"><label for="job">目标岗位描述</label><textarea id="job" placeholder="粘贴 JD…"></textarea></div>
+  </section>
+  <div class="controls">
+    <div><label for="role">目标岗位名称（可选）</label><input id="role" class="small" placeholder="AI Agent Engineer"></div>
+    <div><label for="language">输出语言</label><select id="language"><option value="auto">自动跟随原文</option><option value="zh">中文</option><option value="en">English</option></select></div>
+    <button id="start">开始优化</button>
+  </div>
+
+  <div id="status"></div>
+  <section class="card workflow">
+    <div class="workflow-head"><h2>Agent 执行轨迹</h2><span class="demo-badge">录屏演示模式</span></div>
+    <div id="flow" class="flow"></div>
+    <p id="flow-note" class="flow-note">点击“启动流程演示”，查看 Agent 如何读取记忆、调用知识库工具并经过人工审批完成任务。</p>
+    <div id="diagnostic" class="diagnostic hidden"></div>
+    <div class="demo-actions"><button id="demo" class="secondary">启动流程演示</button><button id="reset-flow" class="secondary">重置轨迹</button></div>
+  </section>
+  <section id="approval" class="card hidden">
+    <div id="match-preview"></div>
+    <h2>请审批优化计划</h2><div id="plan"></div>
+    <div class="controls"><button class="approve" data-approval="true">批准并继续</button><button class="reject" data-approval="false">拒绝计划</button></div>
+  </section>
+  <section id="result" class="result hidden"></section>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const sessionId = crypto.randomUUID();
+  const userId = localStorage.getItem('resume-agent-user-id') || crypto.randomUUID();
+  localStorage.setItem('resume-agent-user-id', userId);
+  const statusText = { intake: '正在接收输入…', parsing: '正在解析简历和岗位…', analyzing: '正在分析岗位匹配度…', awaiting_approval: '等待审批…', rewriting: '正在改写简历…', validating: '正在进行事实和格式校验…', blocked: '流程已停止，需要人工处理', failed: '执行失败', completed: '优化完成' };
+  let busy = false;
+  const flowNodes = [
+    ['intake','输入校验','检查输入'], ['load_memory','读取记忆','读取默认简历'],
+    ['parse','结构化解析','简历 + JD'], ['save_memory','保存记忆','保存本次简历'],
+    ['rag','RAG','检索优化规范'], ['match','匹配分析','分析岗位匹配度'],
+    ['match_tool','Match 工具调用','匹配阶段调用工具'], ['plan','任务规划','生成优化计划'],
+    ['approval','人工审批','等待用户确认'], ['rewrite','执行重写','生成优化简历'],
+    ['validate','质量校验','关键词 / 事实 / 格式'], ['repair','自动修复','失败时有限重试'],
+    ['blocked','阻塞','达到上限或无法安全修复'], ['done','完成','输出最终结果']
+  ];
+  $('flow').innerHTML = flowNodes.map(([id,title,desc]) => `<div class="flow-node" data-node="${id}"><b>${title}</b><span class="node-state">${desc}</span></div>`).join('');
+  const nodeEls = [...document.querySelectorAll('.flow-node')];
+  function paintFlow(active, doneUntil = -1, wait = false) {
+    nodeEls.forEach((el, i) => { el.className = 'flow-node'; if (i <= doneUntil) el.classList.add('done'); if (el.dataset.node === active) el.classList.add(wait ? 'wait' : 'active'); });
+  }
+  const initialFlowNote = $('flow-note').textContent;
+  function resetFlowState() {
+    paintFlow('', -1);
+    nodeEls.forEach((el, i) => {
+      const state = el.querySelector('.node-state');
+      if (state) state.textContent = flowNodes[i][2];
+    });
+    $('diagnostic').classList.add('hidden');
+    $('diagnostic').innerHTML = '';
+    $('approval').classList.add('hidden');
+    $('match-preview').innerHTML = '';
+    $('plan').innerHTML = '';
+    $('result').classList.add('hidden');
+    $('result').innerHTML = '';
+    setStatus('');
+    setFlowNote(initialFlowNote);
+  }
+  function setFlowNote(text) { $('flow-note').textContent = text; }
+  function showDiagnostic(title, items) {
+    const list = (items || []).map(item => `<li>${esc(item)}</li>`).join('');
+    $('diagnostic').innerHTML = `<h3>${esc(title)}</h3>${list ? `<ul>${list}</ul>` : ''}`;
+    $('diagnostic').classList.remove('hidden');
+  }
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  async function playDemoToApproval() {
+    $('demo').disabled = true;
+    const sequence = [
+      ['intake','正在检查简历和岗位输入…'], ['load_memory','正在读取用户默认简历…'],
+      ['parse','正在把简历和 JD 转换为结构化字段…'], ['save_memory','正在保存本次简历…'],
+      ['rag','正在调用 RAG 检索知识库…'], ['match','正在分析岗位匹配度…'],
+      ['match_tool','正在执行 Match 阶段工具调用…'], ['plan','正在生成优化计划…']
+    ];
+    for (let i=0; i<sequence.length; i++) { paintFlow(sequence[i][0], i-1); setFlowNote(sequence[i][1]); await sleep(650); }
+    paintFlow('approval', 5, true); setFlowNote('流程已暂停：等待用户批准优化计划。');
+  }
+  function finishFlow(data) {
+    const status = data.status || '';
+    if (status === 'approval_required') { paintFlow('approval', 5, true); return; }
+    if (status === 'blocked' || status === 'failed') { paintFlow('done', 8); document.querySelector('[data-node="done"]').classList.add('fail'); setFlowNote('流程已停止，Agent 返回阻塞或失败原因。'); return; }
+    paintFlow('done', 9); setFlowNote('流程完成：Agent 已输出优化简历、修改说明和校验结果。');
+  }
+  function setStatus(text) { $('status').textContent = text; }
+  function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function renderPlan(plan) {
+    if (!plan) return '<p>Agent 未返回可展示的计划。</p>';
+    return `<h3>优化目标</h3><ul class="plan">${(plan.goals || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul><h3>执行步骤</h3><ol class="plan">${(plan.steps || []).map(x => `<li>${esc(x)}</li>`).join('')}</ol>`;
+  }
+  function renderMatchPreview(match) {
+    if (!match) return '<p class="muted">暂无匹配分析结果。</p>';
+    const score = typeof match.score === 'number' ? `${Math.round(match.score * 100)}%` : '—';
+    return `<div class="match-hero"><div class="muted">当前岗位匹配度</div><div class="hero-score">${score}</div><div class="muted">匹配分析已完成，以下是 Agent 建议的优化方向</div></div><div class="match-summary"><div><b>已匹配</b><br>${esc((match.matched || []).join('、') || '暂无')}</div><div><b>待补强</b><br>${esc((match.missing || []).join('、') || '暂无')}</div></div>`;
+  }
+  function renderSources(sources) {
+    if (!sources || !sources.length) return '';
+    return `<div class="card" style="margin-top:12px"><h2>本次参考的知识库</h2>${sources.map(x => `<p class="muted">${esc(x.source)}${x.page_number ? ` · 第 ${esc(x.page_number)} 页` : ''}${typeof x.score === 'number' ? ` · 相似度 ${Math.round(x.score * 100)}%` : ''}</p>`).join('')}</div>`;
+  }
+  function renderResult(result) {
+    if (!result) return '';
+    const match = result.match_result || {}, validations = result.validation_results || [], changes = result.changes || [];
+    const score = typeof match.score === 'number' ? `${Math.round(match.score * 100)}%` : '—';
+    return `<div class="cards"><div class="card"><div class="muted">岗位匹配度</div><div class="metric">${score}</div></div><div class="card"><div class="muted">已匹配要求</div><div class="metric">${(match.matched || []).length}</div></div><div class="card"><div class="muted">修改项</div><div class="metric">${changes.length}</div></div></div>
+      <div class="card" style="margin-top:12px"><h2>匹配分析</h2><p><b>Matched：</b>${esc((match.matched || []).join('、') || '暂无')}</p><p><b>Missing：</b>${esc((match.missing || []).join('、') || '暂无')}</p></div>
+      <div class="diff" style="margin-top:12px"><div class="card"><h2>优化后简历</h2><pre>${esc(result.optimized_resume || '没有生成简历')}</pre></div><div class="card"><h2>修改说明</h2><ul class="changes">${changes.map(x => `<li><b>${esc(x.section)}</b><br>${esc(x.reason)}<br><span class="muted">${esc(x.revised)}</span></li>`).join('') || '<li>无修改记录</li>'}</ul></div></div>
+      <div class="card" style="margin-top:12px"><h2>校验结果</h2>${validations.map(x => `<p class="${x.passed ? 'pass' : 'fail'}">${x.passed ? '✓' : '✗'} [${esc(x.category)}] ${esc(x.message)}</p>`).join('') || '<p>暂无校验结果</p>'}</div>`;
+  }
+  function renderOriginalResume(originalResume) {
+    const original = (originalResume || $('resume').value || '').trim() || '本次任务使用了已保存的默认简历。';
+    return `<div class="card" style="margin-bottom:12px"><h2>原始候选简历</h2><pre>${esc(original)}</pre></div>`;
+  }
+  function renderBlockedResume(response) {
+    if (!response.result) return '';
+    return renderOriginalResume(response.original_resume) + renderResult(response.result);
+  }
+  async function call(payload) {
+    busy = true; $('start').disabled = true;
+    try {
+      const res = await fetch('/api/optimize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...payload, user_id:userId, session_id:sessionId}) });
+      const data = await res.json(); if (!res.ok) throw new Error(data.detail || '请求失败');
+      if (data.status === 'approval_required') { setStatus('岗位匹配完成，请先查看分数和缺口，再确认是否改写。'); $('match-preview').innerHTML = renderMatchPreview(data.match_result) + renderSources(data.rag_sources); $('plan').innerHTML = renderPlan(data.plan); $('approval').classList.remove('hidden'); return; }
+      $('approval').classList.add('hidden'); setStatus(statusText[data.status] || data.status); $('result').innerHTML = data.result ? renderResult(data.result) : `<div class="card">${esc(data.error || '没有结果')}</div>`; $('result').classList.remove('hidden');
+    } catch (e) { setStatus(e.message); } finally { busy = false; $('start').disabled = false; }
+  }
+  function liveNode(node, status, note) {
+    const map = { load_resume:'load_memory', save_resume:'save_memory', retrieve_guidelines:'rag', match:'match', plan:'plan', plan_approval:'approval', rewrite:'rewrite', validate:'validate', repair:'repair', finalize:'done', intake:'intake', parse_resume:'parse', parse_job:'parse' };
+    const id = map[node] || node;
+    const el = document.querySelector(`[data-node="${id}"]`);
+    if (!el) return;
+    el.className = `flow-node ${status}`;
+    const state = el.querySelector('.node-state');
+    if (state && note) state.textContent = note;
+    if (note) setFlowNote(note);
+  }
+  function applyStreamEvent(message) {
+    if (message.type === 'node') {
+      const update = message.update || {};
+      const nodeError = update.error || update.errors;
+      liveNode(message.node, nodeError ? 'fail' : (message.node === 'plan_approval' ? 'wait' : 'done'), nodeError ? `节点 ${message.node} 执行失败：${nodeError}` : `后端已完成节点：${message.node}`);
+      if (message.node === 'load_resume') {
+        if (update.resume_source === 'saved_default') {
+          liveNode('load_resume', 'done', '已读取用户默认简历');
+          liveNode('save_resume', 'skip', '本次使用已保存简历，跳过保存');
+        } else {
+          liveNode('load_resume', 'done', '本次请求携带新简历');
+        }
+      }
+      if (message.node === 'save_resume') liveNode('save_resume', 'done', '已保存本次简历为默认简历');
+      if (message.node === 'retrieve_guidelines') liveNode('retrieve_guidelines', 'done', `RAG 已返回 ${(update.rag_sources || []).length} 条来源`);
+      if (message.node === 'validate') {
+        const failures = (update.validation_results || []).filter(x => !x.passed);
+        if (failures.length) {
+          liveNode('validate', 'fail', `关键词/格式校验发现 ${failures.length} 个问题`);
+          showDiagnostic('本轮质量校验失败', failures.map(x => `[${x.category}] ${x.message}`));
+        } else {
+          liveNode('validate', 'done', '质量校验全部通过');
+          showDiagnostic('质量校验通过', ['未发现需要继续修复的问题']);
+        }
+      }
+      if (message.node === 'repair') {
+        const attempt = update.repair_attempts ?? '?';
+        liveNode('repair', 'active', `正在执行第 ${attempt} 次自动修复`);
+        showDiagnostic('关键词校验持续失败，进入自动修复', [`当前修复次数：${attempt}`, 'Agent 将根据校验结果生成定向修复指令，然后重新改写并校验。']);
+      }
+      if (message.node === 'blocked') {
+        liveNode('blocked', 'fail', '无法继续自动修复');
+        showDiagnostic('流程进入 blocked', [update.error || '可能已达到最大修复次数，或存在不可安全修复的问题。']);
+      }
+      if (message.node === 'plan_approval') liveNode('plan_approval', 'wait', '等待用户批准优化计划');
+      return;
+    }
+    if (message.type === 'custom' && message.event?.kind === 'match_tool_call') {
+      const e = message.event;
+      liveNode('match_tool', e.status === 'completed' ? 'done' : 'active', `Match 工具：${e.tool}（${e.status}）`);
+      return;
+    }
+    if (message.type === 'result') {
+      const result = message.result || {};
+      if (result.status === 'approval_required') {
+        liveNode('plan_approval', 'wait', '等待用户批准优化计划');
+        $('match-preview').innerHTML = renderMatchPreview(result.match_result) + renderSources(result.rag_sources);
+        $('plan').innerHTML = renderPlan(result.plan); $('approval').classList.remove('hidden');
+      } else {
+        $('approval').classList.add('hidden'); setStatus(statusText[result.status] || result.status);
+        const reason = result.error || result.result?.error;
+        $('result').innerHTML = reason ? renderBlockedResume(result) + `<div class="error-box"><strong>Agent 执行失败</strong><br>${esc(reason)}</div>` : (result.result ? renderOriginalResume(result.original_resume) + renderResult(result.result) : `<div class="card">没有结果</div>`);
+        $('result').classList.remove('hidden');
+        if (result.status === 'blocked') {
+          const validation = result.result?.validation_results || [];
+          const failures = validation.filter(x => !x.passed).map(x => `[${x.category}] ${x.message}`);
+          showDiagnostic('流程进入 blocked', failures.length ? failures : [reason || '可能已达到最大修复次数。']);
+        }
+        liveNode('finalize', result.status === 'completed' ? 'done' : 'fail', reason ? `流程已停止：${reason}` : (result.status === 'completed' ? '流程完成' : '流程已停止'));
+      }
+    }
+  }
+  async function streamCall(payload) {
+    if (busy) return;
+    if (!Object.prototype.hasOwnProperty.call(payload, 'approval')) resetFlowState();
+    busy = true; $('start').disabled = true; $('demo').disabled = true;
+    try {
+      const res = await fetch('/api/optimize/stream', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...payload, user_id:userId, session_id:sessionId}) });
+      if (!res.ok) { const error = await res.json(); throw new Error(error.detail || '请求失败'); }
+      const reader = res.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
+      while (true) {
+        const {value, done} = await reader.read(); if (done) break;
+        buffer += decoder.decode(value, {stream:true}); const blocks = buffer.split('\n\n'); buffer = blocks.pop();
+        for (const block of blocks) { const line = block.split('\n').find(x => x.startsWith('data: ')); if (line) applyStreamEvent(JSON.parse(line.slice(6))); }
+      }
+    } catch (e) { setStatus(e.message); setFlowNote(`流式执行失败：${e.message}`); $('result').innerHTML = `<div class="error-box"><strong>Agent 请求失败</strong><br>${esc(e.message)}</div>`; $('result').classList.remove('hidden'); }
+    finally { busy = false; $('start').disabled = false; $('demo').disabled = false; }
+  }
+  $('start').onclick = () => { if (!busy) streamCall({resume_content:$('resume').value, job_content:$('job').value, role_title:$('role').value, target_language:$('language').value}); };
+  $('demo').onclick = () => { if (busy) return; streamCall({resume_content:$('resume').value, job_content:$('job').value, role_title:$('role').value, target_language:$('language').value}); };
+  $('reset-flow').onclick = () => { resetFlowState(); };
+  document.querySelectorAll('[data-approval]').forEach(btn => btn.onclick = () => {
+    const approved = btn.dataset.approval === 'true';
+    if (approved) { setFlowNote('用户已批准计划，等待后端继续执行重写、质量校验和条件修复…'); }
+    else { paintFlow('done', 6); document.querySelector('[data-node="done"]').classList.add('fail'); setFlowNote('用户拒绝优化计划，流程安全停止。'); }
+    streamCall({approval:approved});
+  });
+</script>
+</body>
+</html>

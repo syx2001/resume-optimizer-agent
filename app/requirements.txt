@@ -1,0 +1,9 @@
+langchain-core
+langchain-openai
+langchain-text-splitters
+langgraph
+langgraph-checkpoint-postgres
+pydantic>=2
+python-dotenv
+pypdf
+psycopg[binary]

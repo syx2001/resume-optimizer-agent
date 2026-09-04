@@ -1,0 +1,5 @@
+# 忽略所有md文件
+*.md
+
+# 但是放开 Readme.md，允许提交
+!Readme.md
